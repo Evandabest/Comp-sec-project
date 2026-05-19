@@ -10,23 +10,57 @@ st.caption("David Girgis, Yasmin Guerra Flores, Evan Haque")
 
 st.divider()
 
+if "mode" not in st.session_state:
+    st.session_state.mode = "Encrypt"
+if "message" not in st.session_state:
+    st.session_state.message = ""
+if "shift" not in st.session_state:
+    st.session_state.shift = ""
+
+def restore_case(original, result):
+    out = []
+    for orig, res in zip(original, result):
+        out.append(res.lower() if orig.islower() else res)
+    return "".join(out)
+
+def flip():
+    msg = st.session_state.message
+    shf = st.session_state.shift
+    if msg and shf and any(c.isalpha() for c in msg) and shf.isdigit():
+        upper = msg.upper()
+        if st.session_state.mode == "Encrypt":
+            raw = cipher.encrypt(upper, shf)
+            st.session_state.message = restore_case(msg, raw)
+            st.session_state.mode = "Decrypt"
+        else:
+            raw = cipher.decrypt(upper, shf)
+            st.session_state.message = restore_case(msg, raw)
+            st.session_state.mode = "Encrypt"
+
 col_input, col_output = st.columns(2)
 
 with col_input:
     st.subheader("Input")
-    mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True)
+    mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True, key="mode")
     message = st.text_input(
         "Message",
         placeholder="Enter your message",
+        key="message",
     )
     shift = st.text_input(
         "Shift Key (digits)",
         placeholder="e.g. 1221",
+        key="shift",
     )
+    col_submit, col_flip, _ = st.columns([1, 1, 4])
+    with col_submit:
+        submitted = st.button("Submit")
+    with col_flip:
+        st.button("Flip", on_click=flip, help="Swap result into input and toggle mode")
 
 valid = False
 cleaned = ""
-if message and shift:
+if submitted and message and shift:
     cleaned = message.upper()
     if not any(c.isalpha() for c in cleaned):
         st.error("Message must contain at least one letter.")
@@ -39,10 +73,12 @@ with col_output:
     st.subheader("Result")
     if valid:
         if mode == "Encrypt":
-            result = cipher.encrypt(cleaned, shift)
+            raw = cipher.encrypt(cleaned, shift)
+            result = restore_case(message, raw)
             st.success(f"Ciphertext: **{result}**")
         else:
-            result = cipher.decrypt(cleaned, shift)
+            raw = cipher.decrypt(cleaned, shift)
+            result = restore_case(message, raw)
             st.success(f"Plaintext: **{result}**")
     else:
         st.write("Enter a message and shift key to see results.")

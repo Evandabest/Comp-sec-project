@@ -6,7 +6,7 @@ cipher = PolyalphabeticCesearShift()
 st.set_page_config(page_title="Polyalphabetic Caesar Cipher", layout="wide")
 
 st.title("Polyalphabetic Caesar Cipher")
-st.caption("David Girgis, Yasmin Guerra Flores, Evan Haque, Arnob Hassan")
+st.caption("David Girgis, Yasmin Guerra Flores, Evan Haque")
 
 st.divider()
 

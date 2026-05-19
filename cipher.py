@@ -4,18 +4,28 @@ class PolyalphabeticCesearShift:
 
     def encrypt(self, message, shift):
         encrypted = ""
-        for i, char in enumerate(message):
-            charPosition = ord(char) - ord("A")
-            s = int(shift[i % len(shift)])
-            encrypted += self.ALPHABET[(charPosition + s) % 26]
+        shift_index = 0
+        for char in message:
+            if char.isalpha():
+                charPosition = ord(char.upper()) - ord("A")
+                s = int(shift[shift_index % len(shift)])
+                encrypted += self.ALPHABET[(charPosition + s) % 26]
+                shift_index += 1
+            else:
+                encrypted += char
 
         return encrypted
 
     def decrypt(self, message, shift):
         decrypted = ""
-        for i, char in enumerate(message):
-            charPosition = ord(char) - ord("A")
-            s = int(shift[i % len(shift)])
-            decrypted += self.ALPHABET[(charPosition - s) % 26]
+        shift_index = 0
+        for char in message:
+            if char.isalpha():
+                charPosition = ord(char.upper()) - ord("A")
+                s = int(shift[shift_index % len(shift)])
+                decrypted += self.ALPHABET[(charPosition - s) % 26]
+                shift_index += 1
+            else:
+                decrypted += char
 
         return decrypted

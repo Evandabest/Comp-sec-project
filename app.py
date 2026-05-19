@@ -17,7 +17,7 @@ with col_input:
     mode = st.radio("Mode", ["Encrypt", "Decrypt"], horizontal=True)
     message = st.text_input(
         "Message",
-        placeholder="Enter your message (letters only)",
+        placeholder="Enter your message",
     )
     shift = st.text_input(
         "Shift Key (digits)",
@@ -27,9 +27,9 @@ with col_input:
 valid = False
 cleaned = ""
 if message and shift:
-    cleaned = message.upper().replace(" ", "")
-    if not cleaned.isalpha():
-        st.error("Message must contain only letters.")
+    cleaned = message.upper()
+    if not any(c.isalpha() for c in cleaned):
+        st.error("Message must contain at least one letter.")
     elif not shift.isdigit():
         st.error("Shift key must contain only digits (0-9).")
     else:
@@ -53,9 +53,12 @@ if valid:
 
     source = cleaned
     rows = []
-    for i, char in enumerate(source):
+    shift_index = 0
+    for char in source:
+        if not char.isalpha():
+            continue
         pos = ord(char) - ord("A")
-        s = int(shift[i % len(shift)])
+        s = int(shift[shift_index % len(shift)])
         if mode == "Encrypt":
             new_pos = (pos + s) % 26
             op = f"{pos} + {s} = {pos + s} mod 26 = {new_pos}"
@@ -64,7 +67,7 @@ if valid:
             op = f"{pos} - {s} = {pos - s} mod 26 = {new_pos}"
         out_char = chr(new_pos + ord("A"))
         rows.append({
-            "Position": i + 1,
+            "Position": shift_index + 1,
             "Input Letter": char,
             "Letter Value": pos,
             "Shift Key Digit": s,
@@ -72,5 +75,6 @@ if valid:
             "Result Value": new_pos,
             "Output Letter": out_char,
         })
+        shift_index += 1
 
     st.table(rows)

@@ -26,6 +26,9 @@ def restore_case(original, result):
         out.append(res.lower() if orig.islower() else res)
     return "".join(out)
 
+if "flipped" not in st.session_state:
+    st.session_state.flipped = False
+
 def flip():
     msg = st.session_state.message
     keys = st.session_state.cipher_keys
@@ -39,6 +42,7 @@ def flip():
             raw = cipher.decrypt(upper, keys)
             st.session_state.message = restore_case(msg, raw)
             st.session_state.mode = "Encrypt"
+        st.session_state.flipped = True
 
 def add_key():
     st.session_state.cipher_keys.append(st.session_state.new_key_value)
@@ -81,7 +85,8 @@ with col_input:
 keys = st.session_state.cipher_keys
 valid = False
 cleaned = ""
-if submitted and message and keys:
+if (submitted or st.session_state.flipped) and message and keys:
+    st.session_state.flipped = False
     cleaned = message.upper()
     if not any(c.isalpha() for c in cleaned):
         st.error("Message must contain at least one letter.")

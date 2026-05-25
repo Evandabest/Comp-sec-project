@@ -1,5 +1,6 @@
 import streamlit as st
 from cipher import PolyalphabeticCesearShift
+from key_manager import key_manager
 
 cipher = PolyalphabeticCesearShift()
 
@@ -14,8 +15,10 @@ if "mode" not in st.session_state:
     st.session_state.mode = "Encrypt"
 if "message" not in st.session_state:
     st.session_state.message = ""
-if "shift" not in st.session_state:
-    st.session_state.shift = ""
+if "cipher_keys" not in st.session_state:
+    st.session_state.cipher_keys = []
+if "key_version" not in st.session_state:
+    st.session_state.key_version = 0
 
 def restore_case(original, result):
     out = []
@@ -25,17 +28,21 @@ def restore_case(original, result):
 
 def flip():
     msg = st.session_state.message
-    shf = st.session_state.shift
-    if msg and shf and any(c.isalpha() for c in msg) and shf.isdigit():
+    keys = st.session_state.cipher_keys
+    if msg and keys and any(c.isalpha() for c in msg):
         upper = msg.upper()
         if st.session_state.mode == "Encrypt":
-            raw = cipher.encrypt(upper, shf)
+            raw = cipher.encrypt(upper, keys)
             st.session_state.message = restore_case(msg, raw)
             st.session_state.mode = "Decrypt"
         else:
-            raw = cipher.decrypt(upper, shf)
+            raw = cipher.decrypt(upper, keys)
             st.session_state.message = restore_case(msg, raw)
             st.session_state.mode = "Encrypt"
+
+def add_key():
+    st.session_state.cipher_keys.append(st.session_state.new_key_value)
+    st.session_state.key_version += 1
 
 col_input, col_output = st.columns(2)
 
@@ -47,41 +54,55 @@ with col_input:
         placeholder="Enter your message",
         key="message",
     )
-    shift = st.text_input(
-        "Shift Key (digits)",
-        placeholder="e.g. 1221",
-        key="shift",
-    )
+
+    st.markdown("**Cipher Keys** (drag to reorder, double click to remove)")
+    if st.session_state.cipher_keys:
+        result = key_manager(st.session_state.cipher_keys, key=f"keys_{st.session_state.key_version}")
+        if result and result.get("action") == "update":
+            new_keys = result["keys"]
+            if new_keys != st.session_state.cipher_keys:
+                st.session_state.cipher_keys = new_keys
+                st.session_state.key_version += 1
+                st.rerun()
+
+    add_cols = st.columns([2, 1, 3])
+    with add_cols[0]:
+        st.number_input("Shift (0-25)", min_value=0, max_value=25, value=0, key="new_key_value")
+    with add_cols[1]:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.button("Add Key", on_click=add_key)
+
     col_submit, col_flip, _ = st.columns([1, 1, 4])
     with col_submit:
         submitted = st.button("Submit")
     with col_flip:
         st.button("Flip", on_click=flip, help="Swap result into input and toggle mode")
 
+keys = st.session_state.cipher_keys
 valid = False
 cleaned = ""
-if submitted and message and shift:
+if submitted and message and keys:
     cleaned = message.upper()
     if not any(c.isalpha() for c in cleaned):
         st.error("Message must contain at least one letter.")
-    elif not shift.isdigit():
-        st.error("Shift key must contain only digits (0-9).")
     else:
         valid = True
+elif submitted and not keys:
+    st.error("Add at least one cipher key.")
 
 with col_output:
     st.subheader("Result")
     if valid:
         if mode == "Encrypt":
-            raw = cipher.encrypt(cleaned, shift)
+            raw = cipher.encrypt(cleaned, keys)
             result = restore_case(message, raw)
             st.success(f"Ciphertext: **{result}**")
         else:
-            raw = cipher.decrypt(cleaned, shift)
+            raw = cipher.decrypt(cleaned, keys)
             result = restore_case(message, raw)
             st.success(f"Plaintext: **{result}**")
     else:
-        st.write("Enter a message and shift key to see results.")
+        st.write("Enter a message and add keys to see results.")
 
 if valid:
     st.divider()
@@ -89,12 +110,11 @@ if valid:
 
     source = cleaned
     rows = []
-    shift_index = 0
-    for char in source:
+    for i, char in enumerate(source):
         if not char.isalpha():
             continue
         pos = ord(char) - ord("A")
-        s = int(shift[shift_index % len(shift)])
+        s = keys[i % len(keys)]
         if mode == "Encrypt":
             new_pos = (pos + s) % 26
             op = f"{pos} + {s} = {pos + s} mod 26 = {new_pos}"
@@ -103,14 +123,13 @@ if valid:
             op = f"{pos} - {s} = {pos - s} mod 26 = {new_pos}"
         out_char = chr(new_pos + ord("A"))
         rows.append({
-            "Position": shift_index + 1,
+            "Position": i + 1,
             "Input Letter": char,
             "Letter Value": pos,
-            "Shift Key Digit": s,
+            "Key Used": f"c{i % len(keys) + 1} = {s}",
             "Calculation": op,
             "Result Value": new_pos,
             "Output Letter": out_char,
         })
-        shift_index += 1
 
     st.table(rows)

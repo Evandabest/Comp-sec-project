@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; font-family: 'Source Sans Pro', sans-serif; }
+  .container { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px; min-height: 40px; }
+  .chip {
+    display: inline-flex; align-items: center;
+    background: #ff4b4b; color: white; padding: 8px 14px;
+    border-radius: 8px; cursor: grab; user-select: none;
+    font-size: 14px; font-weight: 600;
+    transition: opacity 0.15s, outline 0.1s;
+  }
+  .chip:active { cursor: grabbing; }
+  .chip.dragging { opacity: 0.4; }
+  .chip.over { outline: 2px dashed white; outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="container" id="container"></div>
+
+<script>
+function sendMessageToStreamlitClient(type, data) {
+  var outData = Object.assign({ isStreamlitMessage: true, type: type }, data);
+  window.parent.postMessage(outData, "*");
+}
+
+function init() {
+  sendMessageToStreamlitClient("streamlit:componentReady", { apiVersion: 1 });
+}
+
+function setFrameHeight(height) {
+  sendMessageToStreamlitClient("streamlit:setFrameHeight", { height: height });
+}
+
+function setComponentValue(value) {
+  sendMessageToStreamlitClient("streamlit:setComponentValue", { value: value });
+}
+
+let keys = [];
+let dragIndex = null;
+let lastTap = null;
+let tapTimer = null;
+const container = document.getElementById('container');
+
+function render() {
+  container.innerHTML = '';
+  keys.forEach(function(k, i) {
+    var chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.draggable = true;
+    chip.textContent = 'c' + (i + 1) + ' = ' + k;
+
+    // Double click to remove
+    chip.addEventListener('dblclick', function(e) {
+      e.preventDefault();
+      keys.splice(i, 1);
+      setComponentValue({ action: 'update', keys: keys.slice() });
+      render();
+    });
+
+    // Drag and drop to reorder
+    chip.addEventListener('dragstart', function(e) {
+      dragIndex = i;
+      e.dataTransfer.effectAllowed = 'move';
+      chip.classList.add('dragging');
+    });
+
+    chip.addEventListener('dragend', function() {
+      chip.classList.remove('dragging');
+      dragIndex = null;
+    });
+
+    chip.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragIndex !== null && dragIndex !== i) {
+        chip.classList.add('over');
+      }
+    });
+
+    chip.addEventListener('dragleave', function() {
+      chip.classList.remove('over');
+    });
+
+    chip.addEventListener('drop', function(e) {
+      e.preventDefault();
+      chip.classList.remove('over');
+      if (dragIndex !== null && dragIndex !== i) {
+        var item = keys.splice(dragIndex, 1)[0];
+        keys.splice(i, 0, item);
+        setComponentValue({ action: 'update', keys: keys.slice() });
+        render();
+      }
+    });
+
+    container.appendChild(chip);
+  });
+
+  setFrameHeight(container.scrollHeight + 10);
+}
+
+window.addEventListener("message", function(event) {
+  if (event.data.type !== "streamlit:render") return;
+  keys = event.data.args.keys || [];
+  render();
+});
+
+init();
+</script>
+</body>
+</html>

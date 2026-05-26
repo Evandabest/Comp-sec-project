@@ -115,11 +115,12 @@ if valid:
 
     source = cleaned
     rows = []
-    for i, char in enumerate(source):
+    shift_index = 0
+    for char in source:
         if not char.isalpha():
             continue
         pos = ord(char) - ord("A")
-        s = keys[i % len(keys)]
+        s = keys[shift_index % len(keys)]
         if mode == "Encrypt":
             new_pos = (pos + s) % 26
             op = f"{pos} + {s} = {pos + s} mod 26 = {new_pos}"
@@ -128,13 +129,14 @@ if valid:
             op = f"{pos} - {s} = {pos - s} mod 26 = {new_pos}"
         out_char = chr(new_pos + ord("A"))
         rows.append({
-            "Position": i + 1,
+            "Position": shift_index + 1,
             "Input Letter": char,
             "Letter Value": pos,
-            "Key Used": f"c{i % len(keys) + 1} = {s}",
+            "Key Used": f"c{shift_index % len(keys) + 1} = {s}",
             "Calculation": op,
             "Result Value": new_pos,
             "Output Letter": out_char,
         })
+        shift_index += 1
 
     st.table(rows)

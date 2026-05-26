@@ -1,6 +1,5 @@
 import streamlit as st
 from cipher import PolyalphabeticCesearShift
-from key_manager import key_manager
 
 cipher = PolyalphabeticCesearShift()
 
@@ -15,10 +14,12 @@ if "mode" not in st.session_state:
     st.session_state.mode = "Encrypt"
 if "message" not in st.session_state:
     st.session_state.message = ""
-if "cipher_keys" not in st.session_state:
-    st.session_state.cipher_keys = []
-if "key_version" not in st.session_state:
-    st.session_state.key_version = 0
+if "available_keys" not in st.session_state:
+    st.session_state.available_keys = []
+if "key_sequence" not in st.session_state:
+    st.session_state.key_sequence = []
+if "last_tap" not in st.session_state:
+    st.session_state.last_tap = None
 
 def restore_case(original, result):
     out = []
@@ -29,9 +30,13 @@ def restore_case(original, result):
 if "flipped" not in st.session_state:
     st.session_state.flipped = False
 
+def get_shift_values():
+    avail = st.session_state.available_keys
+    return [avail[i] for i in st.session_state.key_sequence]
+
 def flip():
     msg = st.session_state.message
-    keys = st.session_state.cipher_keys
+    keys = get_shift_values()
     if msg and keys and any(c.isalpha() for c in msg):
         upper = msg.upper()
         if st.session_state.mode == "Encrypt":
@@ -44,9 +49,18 @@ def flip():
             st.session_state.mode = "Encrypt"
         st.session_state.flipped = True
 
-def add_key():
-    st.session_state.cipher_keys.append(st.session_state.new_key_value)
-    st.session_state.key_version += 1
+def add_available_key():
+    st.session_state.available_keys.append(st.session_state.new_key_value)
+
+def add_to_sequence(index):
+    st.session_state.key_sequence.append(index)
+
+def tap_sequence(i):
+    if st.session_state.last_tap == i:
+        st.session_state.key_sequence.pop(i)
+        st.session_state.last_tap = None
+    else:
+        st.session_state.last_tap = i
 
 col_input, col_output = st.columns(2)
 
@@ -59,22 +73,40 @@ with col_input:
         key="message",
     )
 
-    st.markdown("**Cipher Keys** (drag to reorder, double click to remove)")
-    if st.session_state.cipher_keys:
-        result = key_manager(st.session_state.cipher_keys, key=f"keys_{st.session_state.key_version}")
-        if result and result.get("action") == "update":
-            new_keys = result["keys"]
-            if new_keys != st.session_state.cipher_keys:
-                st.session_state.cipher_keys = new_keys
-                st.session_state.key_version += 1
-                st.rerun()
+    st.markdown("**Available Keys** (tap to add to sequence)")
+    if st.session_state.available_keys:
+        avail = st.session_state.available_keys
+        for row_start in range(0, len(avail), 6):
+            row = avail[row_start:row_start + 6]
+            cols = st.columns(6)
+            for j, k in enumerate(row):
+                cols[j].button(
+                    f"c{row_start + j + 1} = {k}",
+                    key=f"avail_{row_start + j}",
+                    on_click=add_to_sequence,
+                    args=(row_start + j,),
+                )
 
     add_cols = st.columns([2, 1, 3])
     with add_cols[0]:
         st.number_input("Shift (0-25)", min_value=0, max_value=25, value=0, key="new_key_value")
     with add_cols[1]:
         st.markdown("<br>", unsafe_allow_html=True)
-        st.button("Add Key", on_click=add_key)
+        st.button("Add Key", on_click=add_available_key)
+
+    st.markdown("**Key Sequence** (double tap to remove)")
+    if st.session_state.key_sequence:
+        seq = st.session_state.key_sequence
+        for row_start in range(0, len(seq), 8):
+            row = seq[row_start:row_start + 8]
+            cols = st.columns(8)
+            for j, idx in enumerate(row):
+                cols[j].button(
+                    f"c{idx + 1}",
+                    key=f"seq_{row_start + j}",
+                    on_click=tap_sequence,
+                    args=(row_start + j,),
+                )
 
     col_submit, col_flip, _ = st.columns([1, 1, 4])
     with col_submit:
@@ -82,7 +114,7 @@ with col_input:
     with col_flip:
         st.button("Flip", on_click=flip, help="Swap result into input and toggle mode")
 
-keys = st.session_state.cipher_keys
+keys = get_shift_values()
 valid = False
 cleaned = ""
 if (submitted or st.session_state.flipped) and message and keys:
@@ -93,7 +125,7 @@ if (submitted or st.session_state.flipped) and message and keys:
     else:
         valid = True
 elif submitted and not keys:
-    st.error("Add at least one cipher key.")
+    st.error("Add keys to the sequence first.")
 
 with col_output:
     st.subheader("Result")
@@ -107,7 +139,7 @@ with col_output:
             result = restore_case(message, raw)
             st.success(f"Plaintext: **{result}**")
     else:
-        st.write("Enter a message and add keys to see results.")
+        st.write("Enter a message and build a key sequence to see results.")
 
 if valid:
     st.divider()
@@ -132,7 +164,7 @@ if valid:
             "Position": shift_index + 1,
             "Input Letter": char,
             "Letter Value": pos,
-            "Key Used": f"c{shift_index % len(keys) + 1} = {s}",
+            "Key Used": f"{s}",
             "Calculation": op,
             "Result Value": new_pos,
             "Output Letter": out_char,
